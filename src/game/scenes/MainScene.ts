@@ -15,8 +15,13 @@ const COLORS = {
   player: 0x4cc3ff,
   aim: 0x8de3ff,
   bullet: 0xffc857,
+  boss: 0xff6b6b,
   uiText: "#ffffff",
 };
+
+const BOSS_RADIUS = 36;
+const BOSS_MAX_HP = 120;
+const BULLET_DAMAGE = 8;
 
 export class MainScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Arc;
@@ -26,6 +31,10 @@ export class MainScene extends Phaser.Scene {
   private lastFiredAt = 0;
   private hp = 100;
   private hpText!: Phaser.GameObjects.Text;
+  private boss!: Phaser.GameObjects.Arc;
+  private bossHp = BOSS_MAX_HP;
+  private bossHpText!: Phaser.GameObjects.Text;
+  private bossDefeated = false;
 
   constructor() {
     super("MainScene");
@@ -41,6 +50,14 @@ export class MainScene extends Phaser.Scene {
     playerBody.setCircle(PLAYER_RADIUS);
     playerBody.setAllowGravity(false);
 
+    this.boss = this.add.circle(GAME_WIDTH / 2, 120, BOSS_RADIUS, COLORS.boss);
+    this.physics.add.existing(this.boss);
+
+    const bossBody = this.boss.body as Phaser.Physics.Arcade.Body;
+    bossBody.setCircle(BOSS_RADIUS);
+    bossBody.setImmovable(true);
+    bossBody.setAllowGravity(false);
+
     this.aimLine = this.add.line(0, 0, 0, 0, 0, 0, COLORS.aim).setLineWidth(2, 2);
 
     this.keys = this.input.keyboard?.addKeys("W,A,S,D,H,R") as Record<
@@ -52,7 +69,13 @@ export class MainScene extends Phaser.Scene {
       fontFamily: "sans-serif",
       fontSize: "18px",
       color: COLORS.uiText,
-    });
+    }).setScrollFactor(0);
+
+    this.bossHpText = this.add.text(16, 40, this.getBossHpLabel(), {
+      fontFamily: "sans-serif",
+      fontSize: "18px",
+      color: COLORS.uiText,
+    }).setScrollFactor(0);
 
     this.input.keyboard?.on("keydown-H", () => {
       this.setHp(Math.max(0, this.hp - 10));
@@ -67,6 +90,7 @@ export class MainScene extends Phaser.Scene {
     this.updateMovement(delta);
     this.updateAim();
     this.handleFire();
+    this.handleBulletBossCollisions();
     this.cleanupBullets();
   }
 
@@ -161,8 +185,48 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  private handleBulletBossCollisions() {
+    if (this.bossDefeated) return;
+
+    for (let i = this.bullets.length - 1; i >= 0; i -= 1) {
+      const bullet = this.bullets[i];
+      if (this.physics.overlap(bullet, this.boss)) {
+        bullet.destroy();
+        this.bullets.splice(i, 1);
+        this.setBossHp(this.bossHp - BULLET_DAMAGE);
+      }
+    }
+  }
+
   private setHp(value: number) {
     this.hp = value;
     this.hpText.setText(`HP: ${this.hp}`);
+  }
+
+  private setBossHp(value: number) {
+    if (this.bossDefeated) return;
+
+    this.bossHp = Math.max(0, value);
+    this.bossHpText.setText(this.getBossHpLabel());
+
+    if (this.bossHp <= 0) {
+      this.bossDefeated = true;
+      this.boss.setVisible(false);
+      const bossBody = this.boss.body as Phaser.Physics.Arcade.Body;
+      bossBody.enable = false;
+      this.add
+        .text(GAME_WIDTH / 2, 80, "BOSS DOWN", {
+          fontFamily: "sans-serif",
+          fontSize: "28px",
+          color: COLORS.uiText,
+        })
+        .setOrigin(0.5, 0.5)
+        .setScrollFactor(0);
+      this.bossHpText.setText("BOSS DOWN");
+    }
+  }
+
+  private getBossHpLabel() {
+    return `BOSS HP: ${this.bossHp}/${BOSS_MAX_HP}`;
   }
 }
