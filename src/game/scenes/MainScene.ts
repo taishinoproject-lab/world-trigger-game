@@ -155,6 +155,22 @@ export class MainScene extends Phaser.Scene {
 
     });
   }
+  private resetState() {
+    // ゲーム進行フラグ
+    this.gameOver = false;
+
+    // 既存の配列/参照を初期化（存在するものだけでOK）
+    this.aimAngle = 0;
+    this.shieldAngle = 0;
+    this.shieldBrokenUntil = 0;
+
+    // HP系（定数名や初期値が既にあるならそれに合わせる）
+    this.playerHP = this.playerMaxHP ?? 100;
+    this.bossHP = this.bossMaxHP ?? 120;
+    this.shieldHP = this.shieldHPMax ?? 80;
+
+    // テキストUIが既に作られてるなら、ここで更新してもいい（create後の方が安全なら後で）
+  }
 
   update(_: number, delta: number) {
     this.updateAim();
@@ -505,59 +521,6 @@ export class MainScene extends Phaser.Scene {
     this.weaponText.setText(this.getWeaponLabel());
   }
 
-<<<<<<< HEAD
-  private resetState() {
-    this.bullets = [];
-    this.lastFiredAt = 0;
-    this.lastBossFiredAt = 0;
-    this.hp = 100;
-    this.bossHp = BOSS_MAX_HP;
-    this.bossDefeated = false;
-    this.weapon = "ASTEROID";
-    this.shieldHp = SHIELD_HP_MAX;
-    this.shieldBrokenUntil = 0;
-    this.shieldAngle = 0;
-    this.aimAngle = 0;
-    this.gameOver = false;
-
-    if (this.boss) {
-      this.boss.setVisible(true);
-      this.boss.setFillStyle(COLORS.boss);
-      const bossBody = this.boss.body as Phaser.Physics.Arcade.Body;
-      bossBody.enable = true;
-    }
-
-    if (this.bossBullets) {
-      this.bossBullets.clear(true, true);
-    }
-
-    if (this.hpText) {
-      this.hpText.setText(`HP: ${this.hp}`);
-    }
-
-    if (this.bossHpText) {
-      this.bossHpText.setText(this.getBossHpLabel());
-    }
-
-    if (this.weaponText) {
-      this.weaponText.setText(this.getWeaponLabel());
-    }
-
-    if (this.shieldHpText) {
-      this.shieldHpText.setText(this.getShieldHpLabel());
-    }
-
-    if (this.shieldStatusText) {
-      this.shieldStatusText.setText("");
-    }
-
-    if (this.shieldGraphics) {
-      this.shieldGraphics.clear();
-    }
-  }
-
-=======
->>>>>>> origin/main
   private getBossHpLabel() {
     return `BOSS HP: ${this.bossHp}/${BOSS_MAX_HP}`;
   }
