@@ -76,6 +76,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   create() {
+    this.resetState();
     this.cameras.main.setBackgroundColor(COLORS.background);
 
     this.player = this.add.circle(GAME_WIDTH / 2, GAME_HEIGHT / 2, PLAYER_RADIUS, COLORS.player);
@@ -99,6 +100,20 @@ export class MainScene extends Phaser.Scene {
       string,
       Phaser.Input.Keyboard.Key
     >;
+    this.input.keyboard?.addCapture([
+      Phaser.Input.Keyboard.KeyCodes.W,
+      Phaser.Input.Keyboard.KeyCodes.A,
+      Phaser.Input.Keyboard.KeyCodes.S,
+      Phaser.Input.Keyboard.KeyCodes.D,
+      Phaser.Input.Keyboard.KeyCodes.ONE,
+      Phaser.Input.Keyboard.KeyCodes.TWO,
+      Phaser.Input.Keyboard.KeyCodes.R,
+    ]);
+
+    this.bossBullets = this.physics.add.group();
+    this.shieldGraphics = this.add.graphics();
+
+    this.input.mouse?.disableContextMenu();
 
     this.bossBullets = this.physics.add.group();
     this.shieldGraphics = this.add.graphics();
@@ -143,11 +158,28 @@ export class MainScene extends Phaser.Scene {
 
     this.input.keyboard?.on("keydown-R", () => {
       this.scene.restart();
+
     });
 
     this.input.keyboard?.on("keydown-F", () => {
       this.launchAsteroidFragments();
     });
+  }
+  private resetState() {
+    // ゲーム進行フラグ
+    this.gameOver = false;
+
+    // 既存の配列/参照を初期化（存在するものだけでOK）
+    this.aimAngle = 0;
+    this.shieldAngle = 0;
+    this.shieldBrokenUntil = 0;
+
+    // HP系（定数名や初期値が既にあるならそれに合わせる）
+    this.playerHP = this.playerMaxHP ?? 100;
+    this.bossHP = this.bossMaxHP ?? 120;
+    this.shieldHP = this.shieldHPMax ?? 80;
+
+    // テキストUIが既に作られてるなら、ここで更新してもいい（create後の方が安全なら後で）
   }
 
   update(_: number, delta: number) {
@@ -197,6 +229,9 @@ export class MainScene extends Phaser.Scene {
       PLAYER_RADIUS,
       GAME_HEIGHT - PLAYER_RADIUS
     );
+
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
+    playerBody.updateFromGameObject();
   }
 
   private updateAim() {
