@@ -30,6 +30,11 @@ const BOSS_BULLET_RADIUS = 5;
 const BOSS_BULLET_SPEED = 480;
 const BOSS_FIRE_RATE = 1.8;
 const BOSS_BULLET_DAMAGE = 10;
+const ASTEROID_SPLIT_DISTANCE = 220;
+const ASTEROID_FRAGMENT_COUNT = 6;
+const ASTEROID_FRAGMENT_RADIUS = 4;
+const ASTEROID_FRAGMENT_SPEED = 560;
+const ASTEROID_FRAGMENT_DAMAGE = 3;
 const SHIELD_HP_MAX = 80;
 const SHIELD_RADIUS = 100;
 const SHIELD_ARC_DEG = 100;
@@ -64,6 +69,7 @@ export class MainScene extends Phaser.Scene {
   private aimAngle = 0;
   private shieldBrokenUntil = 0;
   private gameOver = false;
+  private asteroidFragments: Phaser.GameObjects.Arc[] = [];
 
   constructor() {
     super("MainScene");
@@ -89,7 +95,7 @@ export class MainScene extends Phaser.Scene {
 
     this.aimLine = this.add.line(0, 0, 0, 0, 0, 0, COLORS.aim).setLineWidth(2, 2);
 
-    this.keys = this.input.keyboard?.addKeys("W,A,S,D,ONE,TWO,R") as Record<
+    this.keys = this.input.keyboard?.addKeys("W,A,S,D,F,ONE,TWO,R") as Record<
       string,
       Phaser.Input.Keyboard.Key
     >;
@@ -138,6 +144,10 @@ export class MainScene extends Phaser.Scene {
     this.input.keyboard?.on("keydown-R", () => {
       this.scene.restart();
     });
+
+    this.input.keyboard?.on("keydown-F", () => {
+      this.launchAsteroidFragments();
+    });
   }
 
   update(_: number, delta: number) {
@@ -154,8 +164,11 @@ export class MainScene extends Phaser.Scene {
     }
 
     this.handleBulletBossCollisions();
+    this.handleAsteroidFragmentBossCollisions();
     this.handleBossBulletPlayerCollisions();
+    this.updateAsteroidSplits();
     this.cleanupBullets();
+    this.cleanupAsteroidFragments();
     this.cleanupBossBullets();
   }
 
@@ -228,6 +241,7 @@ export class MainScene extends Phaser.Scene {
     const bullet = this.add.circle(this.player.x, this.player.y, BULLET_RADIUS, COLORS.bullet);
     this.physics.add.existing(bullet);
     bullet.setData("weapon", this.weapon);
+    bullet.setData("origin", { x: this.player.x, y: this.player.y });
 
     const body = bullet.body as Phaser.Physics.Arcade.Body;
     body.setCircle(BULLET_RADIUS);
@@ -313,6 +327,21 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  private handleAsteroidFragmentBossCollisions() {
+    if (this.bossDefeated) return;
+
+    for (let i = this.asteroidFragments.length - 1; i >= 0; i -= 1) {
+      const fragment = this.asteroidFragments[i];
+      const launched = fragment.getData("launched") as boolean | undefined;
+      if (!launched) continue;
+      if (this.physics.overlap(fragment, this.boss)) {
+        fragment.destroy();
+        this.asteroidFragments.splice(i, 1);
+        this.applyBossDamage(ASTEROID_FRAGMENT_DAMAGE);
+      }
+    }
+  }
+
   private handleBossBulletPlayerCollisions() {
     if (this.gameOver) return;
 
@@ -370,7 +399,7 @@ export class MainScene extends Phaser.Scene {
       this.shieldStatusText.setText("");
     }
 
-    const targetAngle = this.aimAngle;
+    const targetAngle = Phaser.Math.Angle.Wrap(this.aimAngle + Math.PI / 2);
     const maxStep = Phaser.Math.DegToRad(SHIELD_FOLLOW_DEG_PER_SEC) * (delta / 1000);
     const deltaAngle = Phaser.Math.Angle.Wrap(targetAngle - this.shieldAngle);
     this.shieldAngle += Phaser.Math.Clamp(deltaAngle, -maxStep, maxStep);
@@ -484,6 +513,73 @@ export class MainScene extends Phaser.Scene {
   private setWeapon(weapon: WeaponType) {
     this.weapon = weapon;
     this.weaponText.setText(this.getWeaponLabel());
+  }
+
+  private updateAsteroidSplits() {
+    for (let i = this.bullets.length - 1; i >= 0; i -= 1) {
+      const bullet = this.bullets[i];
+      const weapon = bullet.getData("weapon") as WeaponType | undefined;
+      if (weapon !== "ASTEROID") continue;
+      if (bullet.getData("split")) continue;
+
+      const origin = bullet.getData("origin") as { x: number; y: number } | undefined;
+      if (!origin) continue;
+
+      const traveled = Phaser.Math.Distance.Between(origin.x, origin.y, bullet.x, bullet.y);
+      if (traveled < ASTEROID_SPLIT_DISTANCE) continue;
+
+      bullet.setData("split", true);
+      this.spawnAsteroidFragments(bullet.x, bullet.y);
+      bullet.destroy();
+      this.bullets.splice(i, 1);
+    }
+  }
+
+  private spawnAsteroidFragments(x: number, y: number) {
+    for (let i = 0; i < ASTEROID_FRAGMENT_COUNT; i += 1) {
+      const fragment = this.add.circle(x, y, ASTEROID_FRAGMENT_RADIUS, COLORS.bullet);
+      this.physics.add.existing(fragment);
+      fragment.setData("launched", false);
+      const body = fragment.body as Phaser.Physics.Arcade.Body;
+      body.setCircle(ASTEROID_FRAGMENT_RADIUS);
+      body.setAllowGravity(false);
+      body.setVelocity(0, 0);
+      this.asteroidFragments.push(fragment);
+    }
+  }
+
+  private launchAsteroidFragments() {
+    if (this.bossDefeated || !this.boss.active) return;
+
+    for (const fragment of this.asteroidFragments) {
+      const launched = fragment.getData("launched") as boolean | undefined;
+      if (launched) continue;
+      const direction = new Phaser.Math.Vector2(
+        this.boss.x - fragment.x,
+        this.boss.y - fragment.y
+      );
+      if (direction.lengthSq() === 0) continue;
+      direction.normalize();
+
+      const body = fragment.body as Phaser.Physics.Arcade.Body;
+      body.setVelocity(direction.x * ASTEROID_FRAGMENT_SPEED, direction.y * ASTEROID_FRAGMENT_SPEED);
+      fragment.setData("launched", true);
+    }
+  }
+
+  private cleanupAsteroidFragments() {
+    for (let i = this.asteroidFragments.length - 1; i >= 0; i -= 1) {
+      const fragment = this.asteroidFragments[i];
+      if (
+        fragment.x < -ASTEROID_FRAGMENT_RADIUS ||
+        fragment.x > GAME_WIDTH + ASTEROID_FRAGMENT_RADIUS ||
+        fragment.y < -ASTEROID_FRAGMENT_RADIUS ||
+        fragment.y > GAME_HEIGHT + ASTEROID_FRAGMENT_RADIUS
+      ) {
+        fragment.destroy();
+        this.asteroidFragments.splice(i, 1);
+      }
+    }
   }
 
   private getBossHpLabel() {
