@@ -109,6 +109,9 @@ export class MainScene extends Phaser.Scene {
 
     this.input.mouse?.disableContextMenu();
 
+    this.bossBullets = this.physics.add.group();
+    this.shieldGraphics = this.add.graphics();
+
     this.hpText = this.add.text(16, 16, `HP: ${this.hp}`, {
       fontFamily: "sans-serif",
       fontSize: "18px",
@@ -149,14 +152,7 @@ export class MainScene extends Phaser.Scene {
 
     this.input.keyboard?.on("keydown-R", () => {
       this.scene.restart();
-    });
 
-    this.input.on(Phaser.Input.Events.POINTER_UP, () => {
-      this.input.keyboard?.resetKeys();
-    });
-
-    this.game.events.on(Phaser.Core.Events.BLUR, () => {
-      this.input.keyboard?.resetKeys();
     });
   }
 
@@ -509,6 +505,7 @@ export class MainScene extends Phaser.Scene {
     this.weaponText.setText(this.getWeaponLabel());
   }
 
+<<<<<<< HEAD
   private resetState() {
     this.bullets = [];
     this.lastFiredAt = 0;
@@ -559,6 +556,8 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+=======
+>>>>>>> origin/main
   private getBossHpLabel() {
     return `BOSS HP: ${this.bossHp}/${BOSS_MAX_HP}`;
   }
